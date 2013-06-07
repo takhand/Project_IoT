@@ -1,24 +1,24 @@
-#------------------  
-#Central Hub - Thasin
-#------------------
+#------------------ 
+#Central Hub - Thasin 
+#------------------ 
 
-#--------------Import Library--------------
+#--------------Import Library-------------- 
 import logging #Used for printing for debug 
-import threading #Used for threading
-import requests #Used for HTTP
-import socket
-import json
-from time import sleep #
+import threading #Used for threading 
+import requests #Used for HTTP 
+import socket 
+import json 
+from time import sleep 
 
 #Used in conjuction with XBee library 
-#for serial communications
+#for serial communications 
 import serial 
 #XBee library configure XBee in API mode
 from xbee import XBee 
-#-------------------------------------------
+#------------------------------------------- 
 
 host = '' 
-port = 8091 
+port = 8087
 backlog = 5 
 size = 20
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
@@ -35,15 +35,15 @@ log = logging.debug
 #open serial port at baud rate of 9600 for Raspberry Pi's Raspbian
 # ser = serial.Serial('/dev/ttyUSB0',9600)
 
-#open serial port at baud rate of 9600 for Apple's Macintosh OSX
-ser = serial.Serial('/dev/tty.usbserial-AE01CQAS',9600)
+#open serial port at baud rate of 9600 for Apple's Macintosh OSX 
+ser = serial.Serial('/dev/tty.usbserial-A100RZ4D', 9600) 
 
-#create object called xbee in respect to the open serial port
-xbee = XBee(ser)
+#create object called xbee in respect to the open serial port 
+xbee = XBee(ser, escaped=True) 
 
-#Thread Class where each inidividual client has its own thread class
-class sendToCloud(threading.Thread):
-	#instatiate the constructor
+#Thread Class where each inidividual client has its own thread class 
+class sendToCloud(threading.Thread): 
+	#instatiate the constructor 
 	def __init__(self, group=None, target=None, 
 				name=None, args=(), kwargs=None, verbose=None):
 		#instiateing the thread default parameters 
@@ -58,9 +58,9 @@ class sendToCloud(threading.Thread):
 		log('data recieved %s from XBee ID %s', self.data, self.dest.encode('hex'))
 		
 		log('Send to to the Cloud')
-		self.httpGET() #Call the method that will send the data to the cloud
+		self.httpPOST() #Call the method that will send the data to the cloud
 
-		sleep(2)#2second delay to limite quota GAE
+		sleep(2) #2second delay to limite quota GAE
 		
 		#Send ACK to the client unit
 		xbee.tx(dest_addr=self.dest, data = '1')
@@ -69,15 +69,13 @@ class sendToCloud(threading.Thread):
 		return 
 
 	#method where it does HTTP GET request to send information by URL
-	def httpGET(self):
+	def httpPOST(self):
+		count = 0;
 		while True:
 			try: 
-				#Create the parameters that creats the payload for HTTP request 
-				payload = {'value': self.data, 'sensor': 'test', 
-							'temp': self.dest.encode('hex')}
-				#Does the HTTP GET request, sets a timeout for 5 seconds 
-				r = requests.get("http://smart-seating-app.appspot.com/add", 
-									params = payload, timeout = 5)
+				url = "http://test8osman.appspot.com/post"
+				headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
+				r = requests.post(url, data=self.data, headers=headers, timeout=5)
 				log(r.url)
 				
 				if r.status_code is 200: #valid acknowledgement from Cloud
@@ -85,6 +83,11 @@ class sendToCloud(threading.Thread):
 					break
 				else: #invalid acknowledgement from cloud
 					log('HTTP Response: %s', r.status_code)
+					count+=1
+					if count == 4:
+						log('Too much tries!!! send ACK')
+						break
+
 			except (TypeError, ValueError) as err: #Handler of HTTP timeout GET request 
 				# log(r.history)
 				# log(r.status_code)
@@ -110,14 +113,33 @@ class sendToXBee(threading.Thread):
 
 		while True:
 			self.ack = xbee.wait_read_frame()
-			self.ack = json.loads(self.ack)
-			if (self.ack['Source'] == self.decode['Destination']) and self.ack('ack') == True:
+			unpackACK = json.loads(self.ack)
+			if (unpackACK['Source'] == unpackACK['Destination']) and unpackACK('ack') == True:
 				self.httpACK()
+				log('Receive Ack Packet')
 				break
 		return 
 
 	def httpACK(self):
-		pass
+		count = 0;
+		while True:
+			try: 
+				url = "http://test8osman.appspot.com/post"
+				headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
+				r = requests.post(url, data=self.ack, headers=headers, timeout=5)
+				log(r.url)
+				if r.status_code is 200: 
+					log('HTTP Response: %s', r.status_code)
+					break
+				else: 
+					log('HTTP Response: %s', r.status_code)
+					count+=1
+					if count == 5:
+						break
+			except (TypeError, ValueError) as err: 
+				log('Get request timeout\n')
+				log('Error: %s', err)
+				break
 		return 
 
 #The Class where it listens from a given port for a packet
@@ -128,35 +150,36 @@ class listener:
 			try:
 				log('waiting for packets...')
 
-				while True: 
-					#Busy waiting for a packet via XBee transfer 
-					packet = xbee.wait_read_frame()
-					log('got packet')
-					unpack = json.loads(packet['rf_data'])
-					try: 
-						if unpack['ack'] == True:
-							continue 
-						else:
-							break 
-					except: 
-						break
-					 
-				
+				# while True: 
+				# 	#Busy waiting for a packet via XBee transfer 
+				# 	packet = xbee.wait_read_frame()
+				# 	log('got packet')
+				# 	unpack = json.loads(packet['rf_data'])
+				# 	try: 
+				# 		if unpack['ack'] == True:
+				# 			continue 
+				# 		else:
+				# 			break 
+				# 	except: 			Q
+				# 		break
+				#Busy waiting for a packet via XBee transfer 
+				packet = xbee.wait_read_frame()
+				log('got packet')
+			
 				t = sendToCloud(args=(packet,)) #instatiate the sendToCloud thread class
 
 				#decode the hex value of source address to String
 				sourceID = packet['source_addr'].encode('hex')	
 				t.setName('Sensor: ' + sourceID) #set the name of the thread to the source ID
 				t.start() #Start the Thread
-
-				log('Number of Threads active: ' + threading.active_count())
+				log('Number of Threads running: ' + threading.enumerate())
 				log('Number of Threads running: ' + threading.enumerate())
 			
 			except KeyboardInterrupt:
 				break
-			except (TypeError, ValueError) as err:
-				log("Error: %s", error)
-				log("Try again!\n")
+			# except (TypeError, ValueError) as err:
+			# 	log("Error: %s", err)
+			# 	log("Try again!\n")
 
 		#Close Serial Port
 		ser.close()
@@ -166,7 +189,6 @@ class listener:
 		while True: 
 			try:
 				log('Listening Request from the Cloud at Port %d', port)
-				log('Listening Request from the Cloud...')
 				client, address = s.accept()
 				print '...connected from:', address
 				
@@ -194,4 +216,3 @@ if __name__ == "__main__" :
 
 	ltx.start()
 	ltc.start()
-	
