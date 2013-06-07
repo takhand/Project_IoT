@@ -7,6 +7,7 @@ import logging #Used for printing for debug
 import threading #Used for threading
 import requests #Used for HTTP
 import socket
+import json
 from time import sleep #
 
 #Used in conjuction with XBee library 
@@ -92,6 +93,32 @@ class sendToCloud(threading.Thread):
 				break
 		return
 
+class sendToXBee(threading.Thread):
+	#instatiate the constructor
+	def __init__(self, group=None, target=None, 
+				name=None, args=(), kwargs=None, verbose=None):
+		#instiateing the thread default parameters 
+		threading.Thread.__init__(self, group=group, target=target, 
+									name=name, verbose=verbose)
+		self.encode = args[0]
+		self.decode = args[1]
+		self.ack = None 
+		return
+
+	def run (self):
+		xbee.tx(dest_addr=self.decode['Destination'], data = self.encode)
+
+		while True:
+			self.ack = xbee.wait_read_frame()
+			self.ack = json.loads(self.ack)
+			if (self.ack['Source'] == self.decode['Destination']) and self.ack('ack') == True:
+				self.httpACK()
+				break
+		return 
+
+	def httpACK(self):
+		pass
+		return 
 
 #The Class where it listens from a given port for a packet
 class listener:
@@ -101,24 +128,36 @@ class listener:
 			try:
 				log('waiting for packets...')
 
-				#Busy waiting for a packet via XBee transfer 
-				packet = xbee.wait_read_frame()
-				log('got packet')
+				while True: 
+					#Busy waiting for a packet via XBee transfer 
+					packet = xbee.wait_read_frame()
+					log('got packet')
+					unpack = json.loads(packet['rf_data'])
+					try: 
+						if unpack['ack'] == True:
+							continue 
+						else:
+							break 
+					except: 
+						break
+					 
+				
+				t = sendToCloud(args=(packet,)) #instatiate the sendToCloud thread class
 
-				#instatiate the sendToCloud thread class
-				t = sendToCloud(args=(packet,))
 				#decode the hex value of source address to String
-				sourceID = packet['source_addr'].encode('hex')
-				#set the name of the thread to the source ID
-				t.setName('XBee: ' + sourceID)
-				#Start the Thread
-				t.start()
+				sourceID = packet['source_addr'].encode('hex')	
+				t.setName('Sensor: ' + sourceID) #set the name of the thread to the source ID
+				t.start() #Start the Thread
 
 				log('Number of Threads active: ' + threading.active_count())
 				log('Number of Threads running: ' + threading.enumerate())
 			
 			except KeyboardInterrupt:
 				break
+			except (TypeError, ValueError) as err:
+				log("Error: %s", error)
+				log("Try again!\n")
+
 		#Close Serial Port
 		ser.close()
 		return
@@ -130,21 +169,19 @@ class listener:
 				log('Listening Request from the Cloud...')
 				client, address = s.accept()
 				print '...connected from:', address
-				data = client.recv(size) 
+				
+				encodedData = client.recv(size) 
+				decodedData = json.loads(encodedData)
 
-				log(str(data))
-
-				if data:
-					client.send(data)
+				t = sendToXBee(args=(encodedData,decodedData))
+				t.setName('Actuator: ' + decodedData['Destination'])
+				t.start()
 
 				client.close()
+			except (TypeError, ValueError) as err :
+				log("error: %s", err)
 
-				data1 = str(data)
-
-				# sendToXBee(data1)
-				xbee.tx(dest_addr='\x00\x02', data = data1)
-			except:
-				break
+		client.close()
 
 
 if __name__ == "__main__" :
