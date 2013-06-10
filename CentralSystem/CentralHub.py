@@ -23,7 +23,9 @@ logging.basicConfig(level = logging.DEBUG,
 log = logging.debug 
 
 #open serial port at baud rate of 9600
-ser = serial.Serial('/dev/ttyUSB0',9600)
+# ser = serial.Serial('/dev/ttyUSB0',9600)
+ser = serial.Serial('/dev/tty.usbserial-A100RZ4D',9600)
+
 
 #create object called xbee in respect to the open serial port
 xbee = XBee(ser)
@@ -100,8 +102,8 @@ class listener:
 				#Start the Thread
 				t.start()
 
-				log('Number of Threads active: ' + threading.active_count())
-				log('Number of Threads running: ' + threading.enumerate())
+				# log('Number of Threads active: ' + threading.active_count())
+				# log('Number of Threads running: ' + threading.enumerate())
 			
 			except KeyboardInterrupt:
 				break
