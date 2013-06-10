@@ -11,9 +11,13 @@ sort2 = sort
 indent = json.dumps(data, sort_keys=True, indent=2)
 separator = json.dumps(data, separators=(',', ':'))
 
+c = json.loads(unsort)
+
 
 print type(data)
 print type(unsort)
+print type(c)
+print type(c[0]['a'])
 
 print unsort
 print sort

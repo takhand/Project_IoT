@@ -49,14 +49,14 @@ void loop() {
 //   Serial.println();
    aJson.deleteItem(msg);
    
-   delay(2000);
-//   current = millis(); 
-//
-//   do {
-//      response = Serial.read();
-//      if ((millis()-current) > 2000) break; 
-//
-//   }while (response == -1);
+//   delay(2000);
+   current = millis(); 
+
+   do {
+      response = Serial.read();
+      if ((millis()-current) > 2000) break; 
+
+   }while (response == -1);
 }
 
 

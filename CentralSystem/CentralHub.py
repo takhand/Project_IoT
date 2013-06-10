@@ -18,7 +18,7 @@ from xbee import XBee
 #------------------------------------------- 
 
 host = '' 
-port = 8087
+port = 8014
 backlog = 5 
 size = 20
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
@@ -26,9 +26,7 @@ s.bind((host,port))
 s.listen(backlog)
 
 # This logging will help keep track on which thread the message is printed out
-logging.basicConfig(level = logging.DEBUG, 
-					format = '(%(threadName)-10s) %(message)s')
-
+logging.basicConfig(level = logging.DEBUG, format = '(%(threadName)-10s) %(message)s')
 #Instantiate the log debug object for easy log type print
 log = logging.debug 
 
@@ -73,9 +71,19 @@ class sendToCloud(threading.Thread):
 		count = 0;
 		while True:
 			try: 
-				url = "http://test8osman.appspot.com/post"
+				url = str(json.loads(self.data)['Dest'])
+				log('Destination: %s', url)
 				headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
 				r = requests.post(url, data=self.data, headers=headers, timeout=5)
+
+				# #Create the parameters that creats the payload for HTTP request 
+				# payload = {'value': self.data, 'sensor': 'test', 
+				# 			'temp': self.dest.encode('hex')}
+				# #Does the HTTP GET request, sets a timeout for 5 seconds 
+				# r = requests.get("http://smart-seating-app.appspot.com/add", 
+				# 					params = payload, timeout = 5)
+
+
 				log(r.url)
 				
 				if r.status_code is 200: #valid acknowledgement from Cloud
@@ -124,7 +132,7 @@ class sendToXBee(threading.Thread):
 		count = 0;
 		while True:
 			try: 
-				url = "http://test8osman.appspot.com/post"
+				url = self.decode['Dest']
 				headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
 				r = requests.post(url, data=self.ack, headers=headers, timeout=5)
 				log(r.url)
@@ -165,21 +173,21 @@ class listener:
 				#Busy waiting for a packet via XBee transfer 
 				packet = xbee.wait_read_frame()
 				log('got packet')
-			
+				log(packet['rf_data'])
 				t = sendToCloud(args=(packet,)) #instatiate the sendToCloud thread class
 
 				#decode the hex value of source address to String
 				sourceID = packet['source_addr'].encode('hex')	
 				t.setName('Sensor: ' + sourceID) #set the name of the thread to the source ID
 				t.start() #Start the Thread
-				log('Number of Threads running: ' + threading.enumerate())
-				log('Number of Threads running: ' + threading.enumerate())
+				# log('Number of Threads active: ' + threading.active_count())
+				# log('Number of Threads running: ' + threading.enumerate())
 			
 			except KeyboardInterrupt:
 				break
-			# except (TypeError, ValueError) as err:
-			# 	log("Error: %s", err)
-			# 	log("Try again!\n")
+			except (TypeError, ValueError) as err:
+				log("Error: %s", err)
+				log("Try again!\n")
 
 		#Close Serial Port
 		ser.close()
