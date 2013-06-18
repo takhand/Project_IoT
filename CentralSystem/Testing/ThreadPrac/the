@@ -1,0 +1,10 @@
+print(
+hello world)
+# OUT:   File "<input>", line 2
+# OUT:     hello world)
+# OUT:               ^
+# OUT: SyntaxError: invalid syntax
+print Hellow
+# OUT: Traceback (most recent call last):
+# OUT:   File "<input>", line 1, in <module>
+# OUT: NameError: name 'Hellow' is not defined
