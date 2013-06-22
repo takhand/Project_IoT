@@ -61,9 +61,14 @@ class sendToCloud(threading.Thread):
 		sleep(2) #2second delay to limite quota GAE
 		
 		#Send ACK to the client unit
-		xbee.tx(dest_addr=self.dest, data = '1')
-		
-		log('send ACK to XBee MY: %s', self.dest.encode('hex'))
+		try:
+			if json.loads(self.data)['R'][0] == True:
+				xbee.tx(dest_addr=self.dest, data = '1')
+				
+				log('send ACK to XBee MY: %s', self.dest.encode('hex'))
+		except (TypeError, ValueError) as err:
+			log('Error: %s', err)
+
 		return 
 
 	#method where it does HTTP GET request to send information by URL
@@ -117,22 +122,26 @@ class sendToXBee(threading.Thread):
 		return
 
 	def run (self):
-		xbee.tx(dest_addr=self.decode['Destination'], data = self.encode)
+		xbee.tx(dest_addr=self.decode['D'], data = self.encode)
 
-		while True:
-			self.ack = xbee.wait_read_frame()
-			unpackACK = json.loads(self.ack)
-			if (unpackACK['Source'] == unpackACK['Destination']) and unpackACK('ack') == True:
-				self.httpACK()
-				log('Receive Ack Packet')
-				break
+		try: 
+			while True and self.decode['R'][0] == True:
+				self.ack = xbee.wait_read_frame()
+				unpackACK = json.loads(self.ack)
+				if (unpackACK['S'] == self.decode['D']) and unpackACK['R'][1] == True:
+					self.httpACK()
+					log('Receive Ack Packet')
+					break
+		except (TypeError, ValueError) as err: 
+			log ('Error: %s', err)
+
 		return 
 
 	def httpACK(self):
 		count = 0;
 		while True:
 			try: 
-				url = self.decode['Dest']
+				url = self.decode['D']
 				headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
 				r = requests.post(url, data=self.ack, headers=headers, timeout=5)
 				log(r.url)
