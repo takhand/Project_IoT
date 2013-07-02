@@ -177,7 +177,7 @@ class listener:
 				# 			continue 
 				# 		else:
 				# 			break 
-				# 	except: 			Q
+				# 	except: 			
 				# 		break
 				#Busy waiting for a packet via XBee transfer 
 				packet = xbee.wait_read_frame()
